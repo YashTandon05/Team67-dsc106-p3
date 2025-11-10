@@ -1,0 +1,21 @@
+body {
+    font: 100%/1.5 system-ui;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding: 5ch;
+}
+
+.country {
+    fill: #ccc;
+    stroke: #999;
+}
+
+.country:hover {
+    fill: #000;
+    stroke: #000;
+}
+
+#map {
+    display: block;
+    margin: 0 auto;
+}

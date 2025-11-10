@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizing Global Warming</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+    <script src="global.js" type="module"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1 style="text-align: center;">How "Global" is Global Warming?</h1>
+    <div id="controls">
+        <label for="yearSlider">Year: <span id="yearValue">1850</span></label>
+        <input type="range" id="yearSlider" min="1850" max="2014" value="1850" step="1">
+    </div>
+    <div id="tooltip"></div>
+    <svg id="map"></svg>
+</body>
+</html>
