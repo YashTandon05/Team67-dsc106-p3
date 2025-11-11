@@ -20,11 +20,10 @@ const tooltip = d3.select("#tooltip")
     .style("opacity", 0)
     .style("font-size", "12px");
 
-// Vars to store data
 let worldData = null;
 let csvData = {};
 let currentYear = 2014;
-let measure = 'absolute'; // 'absolute' or 'change'
+let measure = 'absolute';
 let colorScale = null;
 let colorScaleAbsolute = null;
 let colorScaleChange = null;
@@ -38,27 +37,24 @@ async function loadData() {
     
     worldData = world;
     
-    // Process CSV data
+    // CSV Data Processing
     csv.forEach(d => {
         const year = +d.year;
         const isoCode = String(d.iso_num);
-        const value = d.avg_temp_absolute ? +d.avg_temp_absolute : null;
         
         if (!csvData[year]) {
             csvData[year] = {};
         }
-        
-        if (value !== null && !isNaN(value)) {                
-            csvData[year][isoCode] = {
-                country: d.country,
-                value: value,
-                change: d.avg_temp_change ? +d.avg_temp_change : null,
-                percentChange: d.avg_temp_change ? +d.avg_temp_change : null,
-            };
-        }
+                      
+        csvData[year][isoCode] = {
+            country: d.country,
+            value: d.avg_temp_absolute ? +d.avg_temp_absolute : null,
+            change: d.avg_temp_change ? +d.avg_temp_change : null,
+            percentChange: d.avg_temp_change ? +d.avg_temp_change : null,
+        };
     });
     
-    // Create color scales
+    // Color Scales for both metrics
     const allValues = csv.filter(d => d.avg_temp_absolute).map(d => +d.avg_temp_absolute);
     const minValue = d3.min(allValues);
     const maxValue = d3.max(allValues);
@@ -76,7 +72,8 @@ async function loadData() {
     const maxPercentChange = d3.max(allPercentChanges);
     colorScaleChange = d3.scaleDiverging(d3.interpolateRdBu).domain([-maxPercentChange, 0, maxPercentChange]);
     
-    // Load saved measure from localStorage or use default
+    // Local Storage for remembering settings
+    // TODO : Add remembering year on slider
     if (localStorage.measure) {
         measure = localStorage.measure;
     } else {
@@ -85,20 +82,17 @@ async function loadData() {
     }
     colorScale = measure === 'absolute' ? colorScaleAbsolute : colorScaleChange;
     
-    // Initialize visualization
     drawMap(currentYear);
     drawLegend();
     createYearSlider();
     createMeasureToggle();
 }
 
-// Start loading data
 loadData();
 
 function drawLegend() {
     if (!colorScale) return;
-    
-    // Remove existing legend
+
     svg.selectAll(".legend").remove();
     
     const legendWidth = 300;
@@ -106,22 +100,13 @@ function drawLegend() {
     const legendX = width - legendWidth - 20;
     const legendY = height - 40;
     
-    const legend = svg.append("g")
-        .attr("class", "legend")
-        .attr("transform", `translate(${legendX}, ${legendY})`);
+    const legend = svg.append("g").attr("class", "legend").attr("transform", `translate(${legendX}, ${legendY})`);
     
     const domain = colorScale.domain();
-    // For diverging scale, domain has 3 elements [min, center, max]
-    // For sequential scale, domain has 2 elements [max, min]
-    const legendDomain = measure === 'absolute' 
-        ? domain  // Sequential: [max, min]
-        : [domain[0], domain[2]];  // Diverging: use [min, max] for axis
+    const legendDomain = measure === 'absolute' ? domain : [domain[0], domain[2]];
     
-    const legendScale = d3.scaleLinear()
-        .domain(legendDomain)
-        .range([0, legendWidth]);
+    const legendScale = d3.scaleLinear().domain(legendDomain).range([0, legendWidth]);
     
-    // Create axis with appropriate format based on measure
     let legendAxis;
     if (measure === 'absolute') {
         legendAxis = d3.axisBottom(legendScale)
@@ -133,7 +118,6 @@ function drawLegend() {
             .tickFormat(d => (d > 0 ? '+' : '') + d.toFixed(1) + "%");
     }
     
-    // Gradient for legend
     const gradient = legend.append("defs")
         .append("linearGradient")
         .attr("id", "legend-gradient")
