@@ -12,6 +12,10 @@
     <div id="controls">
         <label for="yearSlider">Year: <span id="yearValue">1850</span></label>
         <input type="range" id="yearSlider" min="1850" max="2014" value="1850" step="1">
+        <div id="measureToggle">
+            <label><input type="radio" name="measure" value="absolute" checked> Absolute (°C)</label>
+            <label><input type="radio" name="measure" value="change"> % Change</label>
+        </div>
     </div>
     <div id="tooltip"></div>
     <svg id="map"></svg>

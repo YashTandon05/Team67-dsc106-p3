@@ -23,8 +23,12 @@ const tooltip = d3.select("#tooltip")
 // Vars to store data
 let worldData = null;
 let csvData = {};
+let baselineData = {}; // Store 1850 baseline temperatures for % change calculation
 let currentYear = 1850;
+let measure = 'absolute'; // 'absolute' or 'change'
 let colorScale = null;
+let colorScaleAbsolute = null;
+let colorScaleChange = null;
 
 // Load CSV temp data
 Promise.all([
@@ -32,6 +36,18 @@ Promise.all([
     d3.csv('data/cmip6_tas_country_annual.csv')]).then(([world, csv]) => {
         worldData = world;
 
+        // First pass: store baseline (1850) temperatures
+        csv.forEach(d => {
+            const year = +d.year;
+            const isoCode = String(d.iso_num);
+            const value = d.avg_temp_absolute ? +d.avg_temp_absolute : null;
+            
+            if (year === 1850 && value !== null && !isNaN(value)) {
+                baselineData[isoCode] = value;
+            }
+        });
+        
+        // Second pass: store all data with percentage changes
         csv.forEach(d => {
             const year = +d.year;
             const isoCode = String(d.iso_num);
@@ -42,20 +58,50 @@ Promise.all([
             }
             
             if (value !== null && !isNaN(value)) {
+                const baseline = baselineData[isoCode];
+                let percentChange = null;
+                
+                // Calculate percentage change from baseline (1850)
+                if (baseline !== undefined && baseline !== null && baseline !== 0) {
+                    percentChange = ((value - baseline) / baseline) * 100;
+                }
+                
                 csvData[year][isoCode] = {
                     country: d.country,
                     value: value,
-                    change: d.avg_temp_change ? +d.avg_temp_change : null
+                    change: d.avg_temp_change ? +d.avg_temp_change : null,
+                    percentChange: percentChange,
+                    baseline: baseline
                 };
             }
         });
     
+        // Create color scales
         const allValues = csv.filter(d => d.avg_temp_absolute).map(d => +d.avg_temp_absolute);
         const minValue = d3.min(allValues);
         const maxValue = d3.max(allValues);
         
-        // Color scale (reversed so red = hot, blue = cold)
-        colorScale = d3.scaleSequential(d3.interpolateRdYlBu).domain([maxValue, minValue]);
+        // Sequential color scale for absolute values (reversed so red = hot, blue = cold)
+        colorScaleAbsolute = d3.scaleSequential(d3.interpolateRdYlBu).domain([maxValue, minValue]);
+        
+        // Calculate max absolute percentage change for diverging scale
+        const allPercentChanges = [];
+        Object.keys(csvData).forEach(year => {
+            Object.keys(csvData[year]).forEach(isoCode => {
+                const data = csvData[year][isoCode];
+                if (data.percentChange !== null && !isNaN(data.percentChange)) {
+                    allPercentChanges.push(Math.abs(data.percentChange));
+                }
+            });
+        });
+        const maxPercentChange = d3.max(allPercentChanges) || 5; // Default to 5% if no data
+        
+        // Diverging color scale for % change (centered at 0)
+        colorScaleChange = d3.scaleDiverging(d3.interpolateRdBu)
+            .domain([-maxPercentChange, 0, maxPercentChange]);
+        
+        // Set initial color scale
+        colorScale = colorScaleAbsolute;
         
         drawMap(currentYear);
         drawLegend();
@@ -68,11 +114,24 @@ Promise.all([
             yearValue.text(currentYear);
             drawMap(currentYear);
         });
+        
+        // Event listener for measure toggle
+        d3.selectAll('input[name="measure"]').on("change", function() {
+            measure = this.value;
+            // Update color scale based on measure
+            colorScale = measure === 'absolute' ? colorScaleAbsolute : colorScaleChange;
+            // Redraw map and legend
+            drawMap(currentYear);
+            drawLegend();
+        });
     }
 );
 
 function drawLegend() {
     if (!colorScale) return;
+    
+    // Remove existing legend
+    svg.selectAll(".legend").remove();
     
     const legendWidth = 300;
     const legendHeight = 20;
@@ -83,13 +142,28 @@ function drawLegend() {
         .attr("class", "legend")
         .attr("transform", `translate(${legendX}, ${legendY})`);
     
+    const domain = colorScale.domain();
+    // For diverging scale, domain has 3 elements [min, center, max]
+    // For sequential scale, domain has 2 elements [max, min]
+    const legendDomain = measure === 'absolute' 
+        ? domain  // Sequential: [max, min]
+        : [domain[0], domain[2]];  // Diverging: use [min, max] for axis
+    
     const legendScale = d3.scaleLinear()
-        .domain(colorScale.domain())
+        .domain(legendDomain)
         .range([0, legendWidth]);
     
-    const legendAxis = d3.axisBottom(legendScale)
-        .ticks(5)
-        .tickFormat(d => d.toFixed(1) + "°C");
+    // Create axis with appropriate format based on measure
+    let legendAxis;
+    if (measure === 'absolute') {
+        legendAxis = d3.axisBottom(legendScale)
+            .ticks(5)
+            .tickFormat(d => d.toFixed(1) + "°C");
+    } else {
+        legendAxis = d3.axisBottom(legendScale)
+            .ticks(5)
+            .tickFormat(d => (d > 0 ? '+' : '') + d.toFixed(1) + "%");
+    }
     
     // Gradient for legend
     const gradient = legend.append("defs")
@@ -99,9 +173,16 @@ function drawLegend() {
         .attr("x2", "100%");
     
     const numStops = 10;
-    const domain = colorScale.domain();
     for (let i = 0; i <= numStops; i++) {
-        const value = d3.interpolateNumber(domain[0], domain[1])(i / numStops);
+        let value;
+        if (measure === 'absolute') {
+            // Sequential scale: interpolate from max to min
+            value = d3.interpolateNumber(domain[0], domain[1])(i / numStops);
+        } else {
+            // Diverging scale: interpolate from negative to positive through 0
+            // Domain is [min, center, max] = [-maxPercentChange, 0, maxPercentChange]
+            value = d3.interpolateNumber(domain[0], domain[2])(i / numStops);
+        }
         gradient.append("stop")
             .attr("offset", `${(i / numStops) * 100}%`)
             .attr("stop-color", colorScale(value));
@@ -118,13 +199,18 @@ function drawLegend() {
         .attr("transform", `translate(0, ${legendHeight})`)
         .call(legendAxis);
     
+    // Legend title based on measure
+    const legendTitle = measure === 'absolute' 
+        ? "Average Temperature (°C)" 
+        : "Temperature Change (Δ)";
+    
     legend.append("text")
         .attr("x", legendWidth / 2)
         .attr("y", -5)
         .style("text-anchor", "middle")
         .style("font-size", "12px")
         .style("font-weight", "bold")
-        .text("Average Temperature (°C)");
+        .text(legendTitle);
 }
 
 function drawMap(year) {
@@ -147,9 +233,18 @@ function drawMap(year) {
             const isoCode = String(d.id);
             const data = yearData[isoCode];
             
-            if (data && data.value !== null && colorScale) {
-                const color = colorScale(data.value);
-                return color;
+            if (data && colorScale) {
+                let valueToUse = null;
+                if (measure === 'absolute') {
+                    valueToUse = data.value;
+                } else {
+                    valueToUse = data.percentChange;
+                }
+                
+                if (valueToUse !== null && !isNaN(valueToUse)) {
+                    const color = colorScale(valueToUse);
+                    return color;
+                }
             }
             return '#ccc';
         }).attr('stroke', '#fff').attr('stroke-width', 0.5)
@@ -160,14 +255,25 @@ function drawMap(year) {
             d3.select(this).attr('stroke', '#000').attr('stroke-width', 2);
 
             if (data) {
+                let tooltipHtml = `<strong>${data.country}</strong><br/>Year: ${year}<br/>`;
+                
+                if (measure === 'absolute') {
+                    tooltipHtml += `Temperature: ${data.value.toFixed(2)}°C`;
+                    if (data.percentChange !== null && !isNaN(data.percentChange)) {
+                        tooltipHtml += `<br/>Δ: ${data.percentChange > 0 ? '+' : ''}${data.percentChange.toFixed(2)}%`;
+                    }
+                } else {
+                    if (data.percentChange !== null && !isNaN(data.percentChange)) {
+                        tooltipHtml += `Δ Temperature: ${data.percentChange > 0 ? '+' : ''}${data.percentChange.toFixed(2)}%`;
+                        tooltipHtml += `<br/>Temperature: ${data.value.toFixed(2)}°C`;
+                    } else {
+                        tooltipHtml += `Δ Temperature: N/A`;
+                    }
+                }
+                
                 tooltip
                     .style('opacity', 1)
-                    .html(`
-                        <strong>${data.country}</strong><br/>
-                        Year: ${year}<br/>
-                        Temperature: ${data.value.toFixed(2)}°C
-                        ${data.change !== null ? `<br/>Change: ${data.change > 0 ? '+' : ''}${data.change.toFixed(2)}°C` : ''}
-                    `)
+                    .html(tooltipHtml)
                     .style('left', (event.pageX + 10) + 'px')
                     .style('top', (event.pageY - 10) + 'px');
             } else {
