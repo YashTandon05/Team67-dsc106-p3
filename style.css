@@ -5,17 +5,35 @@ body {
     padding: 5ch;
 }
 
+#controls {
+    margin: 20px 0;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 5px;
+    text-align: center;
+}
+
+#yearSlider {
+    width: 300px;
+    margin-left: 10px;
+}
+
+#yearValue {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
 .country {
-    fill: #ccc;
-    stroke: #999;
+    transition: stroke-width 0.2s;
 }
 
 .country:hover {
-    fill: #000;
-    stroke: #000;
+    stroke-width: 2px !important;
 }
 
 #map {
     display: block;
     margin: 0 auto;
+    border: 1px solid #ddd;
+    background: #f9f9f9;
 }
