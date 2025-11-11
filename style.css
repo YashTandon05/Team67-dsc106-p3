@@ -23,6 +23,25 @@ body {
     font-size: 1.2em;
 }
 
+#measureToggle {
+    display: inline-flex;
+    gap: 15px;
+    margin-left: 20px;
+    align-items: center;
+}
+
+#measureToggle label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+#measureToggle input[type="radio"] {
+    cursor: pointer;
+}
+
 .country {
     transition: stroke-width 0.2s;
 }
