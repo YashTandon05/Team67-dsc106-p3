@@ -23,100 +23,77 @@ const tooltip = d3.select("#tooltip")
 // Vars to store data
 let worldData = null;
 let csvData = {};
-let baselineData = {};
-let currentYear = 1850;
+let currentYear = 2014;
 let measure = 'absolute'; // 'absolute' or 'change'
 let colorScale = null;
 let colorScaleAbsolute = null;
 let colorScaleChange = null;
 
-// Load CSV temp data
-Promise.all([
-    d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
-    d3.csv('data/cmip6_tas_country_annual.csv')]).then(([world, csv]) => {
-        worldData = world;
-
-        // First pass: store baseline (1850) temperatures
-        csv.forEach(d => {
-            const year = +d.year;
-            const isoCode = String(d.iso_num);
-            const value = d.avg_temp_absolute ? +d.avg_temp_absolute : null;
-            
-            if (year === 1850 && value !== null && !isNaN(value)) {
-                baselineData[isoCode] = value;
-            }
-        });
-        
-        // Second pass: store all data with percentage changes
-        csv.forEach(d => {
-            const year = +d.year;
-            const isoCode = String(d.iso_num);
-            const value = d.avg_temp_absolute ? +d.avg_temp_absolute : null;
-            
-            if (!csvData[year]) {
-                csvData[year] = {};
-            }
-            
-            if (value !== null && !isNaN(value)) {                
-                csvData[year][isoCode] = {
-                    country: d.country,
-                    value: value,
-                    change: d.avg_temp_change ? +d.avg_temp_change : null,
-                    percentChange: d.avg_temp_change ? +d.avg_temp_change : null,
-                };
-            }
-        });
+// Load and initialize data
+async function loadData() {
+    const [world, csv] = await Promise.all([
+        d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
+        d3.csv('data/cmip6_tas_country_annual.csv')
+    ]);
     
-        // Create color scales
-        const allValues = csv.filter(d => d.avg_temp_absolute).map(d => +d.avg_temp_absolute);
-        const minValue = d3.min(allValues);
-        const maxValue = d3.max(allValues);
+    worldData = world;
+    
+    // Process CSV data
+    csv.forEach(d => {
+        const year = +d.year;
+        const isoCode = String(d.iso_num);
+        const value = d.avg_temp_absolute ? +d.avg_temp_absolute : null;
         
-        // Sequential color scale for absolute values (reversed so red = hot, blue = cold)
-        colorScaleAbsolute = d3.scaleSequential(d3.interpolateRdYlBu).domain([maxValue, minValue]);
+        if (!csvData[year]) {
+            csvData[year] = {};
+        }
         
-        // Calculate max absolute percentage change for diverging scale
-        const allPercentChanges = [];
-        Object.keys(csvData).forEach(year => {
-            Object.keys(csvData[year]).forEach(isoCode => {
-                const data = csvData[year][isoCode];
-                if (data.percentChange !== null && !isNaN(data.percentChange)) {
-                    allPercentChanges.push(Math.abs(data.percentChange));
-                }
-            });
+        if (value !== null && !isNaN(value)) {                
+            csvData[year][isoCode] = {
+                country: d.country,
+                value: value,
+                change: d.avg_temp_change ? +d.avg_temp_change : null,
+                percentChange: d.avg_temp_change ? +d.avg_temp_change : null,
+            };
+        }
+    });
+    
+    // Create color scales
+    const allValues = csv.filter(d => d.avg_temp_absolute).map(d => +d.avg_temp_absolute);
+    const minValue = d3.min(allValues);
+    const maxValue = d3.max(allValues);
+    colorScaleAbsolute = d3.scaleSequential(d3.interpolateRdYlBu).domain([maxValue, minValue]);
+
+    const allPercentChanges = [];
+    Object.keys(csvData).forEach(year => {
+        Object.keys(csvData[year]).forEach(isoCode => {
+            const data = csvData[year][isoCode];
+            if (data.percentChange !== null && !isNaN(data.percentChange)) {
+                allPercentChanges.push(Math.abs(data.percentChange));
+            }
         });
-        const maxPercentChange = d3.max(allPercentChanges) || 5; // Default to 5% if no data
-        
-        // Diverging color scale for % change (centered at 0)
-        colorScaleChange = d3.scaleDiverging(d3.interpolateRdBu)
-            .domain([-maxPercentChange, 0, maxPercentChange]);
-        
-        // Set initial color scale
-        colorScale = colorScaleAbsolute;
-        
-        drawMap(currentYear);
-        drawLegend();
-        
-        const yearSlider = d3.select("#yearSlider");
-        const yearValue = d3.select("#yearValue");
-        
-        yearSlider.on("input", function() {
-            currentYear = +this.value;
-            yearValue.text(currentYear);
-            drawMap(currentYear);
-        });
-        
-        // Event listener for measure toggle
-        d3.selectAll('input[name="measure"]').on("change", function() {
-            measure = this.value;
-            // Update color scale based on measure
-            colorScale = measure === 'absolute' ? colorScaleAbsolute : colorScaleChange;
-            // Redraw map and legend
-            drawMap(currentYear);
-            drawLegend();
-        });
+    });
+    const maxPercentChange = d3.max(allPercentChanges);
+    colorScaleChange = d3.scaleDiverging(d3.interpolateRdBu).domain([-maxPercentChange, 0, maxPercentChange]);
+    
+    // Load saved measure from localStorage or use default
+    if (localStorage.measure) {
+        measure = localStorage.measure;
+    } else {
+        measure = 'absolute';
+        localStorage.measure = measure;
     }
-);
+    colorScale = measure === 'absolute' ? colorScaleAbsolute : colorScaleChange;
+    
+    // Initialize visualization
+    drawMap(currentYear);
+    drawLegend();
+    createYearSlider();
+    createMeasureToggle();
+}
+
+// Start loading data
+loadData();
 
 function drawLegend() {
     if (!colorScale) return;
@@ -168,11 +145,11 @@ function drawLegend() {
         let value;
         if (measure === 'absolute') {
             // Sequential scale: interpolate from max to min
-            value = d3.interpolateNumber(domain[0], domain[1])(i / numStops);
+            value = d3.interpolateNumber(domain[1], domain[0])(i / numStops);
         } else {
             // Diverging scale: interpolate from negative to positive through 0
             // Domain is [min, center, max] = [-maxPercentChange, 0, maxPercentChange]
-            value = d3.interpolateNumber(domain[0], domain[2])(i / numStops);
+            value = d3.interpolateNumber(domain[2], domain[0])(i / numStops);
         }
         gradient.append("stop")
             .attr("offset", `${(i / numStops) * 100}%`)
@@ -296,6 +273,32 @@ function drawMap(year) {
             
             // TODO 
         });
+}
+
+function createYearSlider() {
+    const yearSlider = d3.select("#yearSlider");
+    const yearValue = d3.select("#yearValue");
+    
+    yearSlider.on("input", function() {
+        currentYear = +this.value;
+        yearValue.text(currentYear);
+        drawMap(currentYear);
+    });
+}
+
+function createMeasureToggle() {
+    const select = document.querySelector('#measureSelect');
+    
+    select.value = measure;
+    select.addEventListener('change', function(event) {
+        measure = event.target.value;
+        localStorage.measure = measure;
+        
+        colorScale = measure === 'absolute' ? colorScaleAbsolute : colorScaleChange;
+        
+        drawMap(currentYear);
+        drawLegend();
+    });
 }
 
 
