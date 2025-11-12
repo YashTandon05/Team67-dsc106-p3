@@ -7,14 +7,11 @@ const height = 600;
 const svg = d3.select("#map").attr("width", width).attr("height", height);
 const g = svg.append('g');
 
-// Setup zoom behavior
 const zoom = d3.zoom()
-    .scaleExtent([1, 8])  // Allow zoom from 1x to 8x
+    .scaleExtent([1, 8])
     .on('zoom', (event) => {
         g.attr('transform', event.transform);
     });
-
-// Apply zoom to SVG
 svg.call(zoom);
 
 const projection = d3.geoMercator().scale(140).translate([width/2, height/1.5]);
@@ -92,8 +89,6 @@ async function loadData() {
     const interpolateBlRd = t => d3.interpolateRdBu(1 - t);
     colorScaleChange = d3.scaleDiverging(interpolateBlRd).domain([-maxPercentChange, 0, maxPercentChange]);
     
-    // Local Storage for remembering settings
-    // TODO : Add remembering year on slider
     if (localStorage.measure) {
         measure = localStorage.measure;
     } else {
@@ -148,11 +143,8 @@ function drawLegend() {
     for (let i = 0; i <= numStops; i++) {
         let value;
         if (measure === 'absolute') {
-            // Sequential scale: interpolate from max to min
             value = d3.interpolateNumber(domain[0], domain[1])(i / numStops);
         } else {
-            // Diverging scale: interpolate from negative to positive through 0
-            // Domain is [min, center, max] = [-maxPercentChange, 0, maxPercentChange]
             value = d3.interpolateNumber(domain[0], domain[2])(i / numStops);
         }
         gradient.append("stop")
@@ -171,11 +163,10 @@ function drawLegend() {
         .attr("transform", `translate(0, ${legendHeight})`)
         .call(legendAxis);
     
-    // Legend title based on measure
-    const legendTitle = measure === 'absolute' 
-        ? "Average Temperature (°C)" 
-        : "Temperature Change (Δ)";
-    
+    const legendTitle = measure === 'absolute' ? "Average Temperature (°C)" : "Temperature Change (Δ%)";
+    const mapSubtitle = measure === 'absolute' ? "Choropleth Map of Average Annual Temperatures (°C), aggregated by country" : "Choropleth Map of Temperature Change from previous year (%), aggregated by country";
+    d3.select("#main-subtitle").text(mapSubtitle);
+
     legend.append("text")
         .attr("x", legendWidth / 2)
         .attr("y", -5)
@@ -298,37 +289,32 @@ function createYearSlider() {
 
 function createMeasureToggle() {
     const checkbox = document.getElementById('measureCheckbox');
-    
-    // Set initial state
-    // unchecked = absolute, checked = change
     checkbox.checked = (measure === 'change');
     
-    // Add event listener
     checkbox.addEventListener('change', function(event) {
         measure = event.target.checked ? 'change' : 'absolute';
         localStorage.measure = measure;
         
         colorScale = measure === 'absolute' ? colorScaleAbsolute : colorScaleChange;
+        const mapSubtitle = measure === 'absolute' ? "Choropleth Map of Average Annual Temperatures (°C), aggregated by country" : "Choropleth Map of Temperature Change from previous year (%), aggregated by country";
+        d3.select("#main-subtitle").text(mapSubtitle);
         
         drawMap(currentYear);
         drawLegend();
     });
 }
 
-// Simple 1D Kalman Filter for smoothing temperature data
 function kalmanFilter(data, processNoise = 0.01, measurementNoise = 0.6) {
     if (data.length === 0) return data;
     
     const smoothedData = [];
-    let estimate = data[0].temperature; // Initial estimate
-    let errorEstimate = 1.0; // Initial error estimate
+    let estimate = data[0].temperature;
+    let errorEstimate = 1.0;
     
     data.forEach((point, i) => {
-        // Prediction step
         const predictedEstimate = estimate;
         const predictedError = errorEstimate + processNoise;
         
-        // Update step
         const kalmanGain = predictedError / (predictedError + measurementNoise);
         estimate = predictedEstimate + kalmanGain * (point.temperature - predictedEstimate);
         errorEstimate = (1 - kalmanGain) * predictedError;
@@ -344,7 +330,6 @@ function kalmanFilter(data, processNoise = 0.01, measurementNoise = 0.6) {
 }
 
 function showCountryModal(isoCode, countryName) {
-    // Get all data for this country across all years
     const countryData = [];
     Object.keys(csvData).forEach(year => {
         if (csvData[year][isoCode]) {
@@ -358,25 +343,19 @@ function showCountryModal(isoCode, countryName) {
         }
     });
     
-    // Sort by year
     countryData.sort((a, b) => a.year - b.year);
     
     if (countryData.length === 0) {
-        return; // No data to display
+        return;
     }
     
-    // Show modal
     const modal = d3.select("#modal");
     modal.style("display", "flex");
     
-    // Clear previous content
     modal.selectAll("*").remove();
     
-    // Create modal content container
-    const modalContent = modal.append("div")
-        .attr("class", "modal-content");
+    const modalContent = modal.append("div").attr("class", "modal-content");
     
-    // Add close button
     modalContent.append("button")
         .attr("class", "close-button")
         .html("&times;")
@@ -384,12 +363,13 @@ function showCountryModal(isoCode, countryName) {
             modal.style("display", "none");
         });
     
-    // Add title
     modalContent.append("h2")
         .attr("class", "line-graph-title")
-        .text(`Temperature History: ${countryName}`);
+        .text(`Average Annual Temperature (°C) since 1850: ${countryName}`);
+    modalContent.append("p")
+        .attr("class", "line-graph-subtitle")
+        .text("The annual averages are calculated by aggregating bi-monthly average temperature data for each country. Kalman filtering is applied to smooth the data to remove noise and clearly illustrate the general trend.");
     
-    // Add legend explaining the lines
     const legendDiv = modalContent.append("div")
         .style("text-align", "center")
         .style("margin-bottom", "10px")
@@ -406,7 +386,6 @@ function showCountryModal(isoCode, countryName) {
         .style("font-weight", "bold")
         .text("━ Kalman Smoothed");
     
-    // Create SVG for line graph
     const graphWidth = 800;
     const graphHeight = 400;
     const margin = { top: 20, right: 30, bottom: 50, left: 60 };
@@ -418,26 +397,21 @@ function showCountryModal(isoCode, countryName) {
         .attr("width", graphWidth)
         .attr("height", graphHeight);
     
-    // Create a group for the graph content (to be zoomed)
     const graphG = graphSvg.append("g")
         .attr("transform", `translate(${margin.left}, ${margin.top})`);
     
-    // Create a clip path to keep graph within bounds
     graphSvg.append("defs").append("clipPath")
         .attr("id", "clip")
         .append("rect")
         .attr("width", innerWidth)
         .attr("height", innerHeight);
     
-    // Create a group for zoomable content
     const zoomableContent = graphG.append("g")
         .attr("clip-path", "url(#clip)");
     
-    // Create scales
     const xScale = d3.scaleLinear()
         .domain(d3.extent(countryData, d => d.year))
         .range([0, innerWidth]);
-    
     const yScale = d3.scaleLinear()
         .domain([
             d3.min(countryData, d => d.temperature) - 1,
@@ -445,20 +419,11 @@ function showCountryModal(isoCode, countryName) {
         ])
         .range([innerHeight, 0]);
     
-    // Apply Kalman filter to smooth the data
     const smoothedData = kalmanFilter(countryData, 0.1, 0.5);
     
-    // Create line generator for original data
-    const lineOriginal = d3.line()
-        .x(d => xScale(d.year))
-        .y(d => yScale(d.temperature));
+    const lineOriginal = d3.line().x(d => xScale(d.year)).y(d => yScale(d.temperature));
+    const lineSmoothed = d3.line().x(d => xScale(d.year)).y(d => yScale(d.temperature));
     
-    // Create line generator for smoothed data
-    const lineSmoothed = d3.line()
-        .x(d => xScale(d.year))
-        .y(d => yScale(d.temperature));
-    
-    // Draw the original line (lighter/more transparent)
     zoomableContent.append("path")
         .datum(countryData)
         .attr("fill", "none")
@@ -467,7 +432,6 @@ function showCountryModal(isoCode, countryName) {
         .attr("stroke-opacity", 0.3)
         .attr("d", lineOriginal);
     
-    // Draw the smoothed line (prominent)
     zoomableContent.append("path")
         .datum(smoothedData)
         .attr("fill", "none")
@@ -475,7 +439,6 @@ function showCountryModal(isoCode, countryName) {
         .attr("stroke-width", 2.5)
         .attr("d", lineSmoothed);
     
-    // Add dots for each data point (using smoothed data)
     zoomableContent.selectAll("circle")
         .data(smoothedData)
         .enter()
@@ -490,7 +453,6 @@ function showCountryModal(isoCode, countryName) {
                 .attr("r", 5)
                 .attr("fill", "#e74c3c");
             
-            // Show tooltip with both smoothed and original values
             tooltip
                 .style("opacity", 1)
                 .html(`<strong>Year: ${d.year}</strong><br/>Smoothed: ${d.temperature.toFixed(2)}°C<br/>Original: ${d.originalTemperature.toFixed(2)}°C`)
@@ -509,7 +471,6 @@ function showCountryModal(isoCode, countryName) {
             tooltip.style("opacity", 0);
         });
     
-    // Add X axis
     const xAxis = d3.axisBottom(xScale)
         .tickFormat(d3.format("d"));
     
@@ -524,22 +485,17 @@ function showCountryModal(isoCode, countryName) {
         .attr("dy", ".15em")
         .attr("transform", "rotate(-45)");
     
-    // Add Y axis
     const yAxis = d3.axisLeft(yScale);
     
     const yAxisGroup = graphG.append("g")
         .attr("class", "y-axis")
         .call(yAxis);
     
-    // Setup zoom behavior for line graph
     const lineZoom = d3.zoom()
-        .scaleExtent([1, 10])  // Allow zoom from 1x to 10x
+        .scaleExtent([1, 10])
         .on('zoom', (event) => {
-            // Update scales based on transform
             const newXScale = event.transform.rescaleX(xScale);
             const newYScale = event.transform.rescaleY(yScale);
-            
-            // Update axes
             xAxisGroup.call(d3.axisBottom(newXScale).tickFormat(d3.format("d")));
             xAxisGroup.selectAll("text")
                 .style("text-anchor", "end")
@@ -549,7 +505,6 @@ function showCountryModal(isoCode, countryName) {
             
             yAxisGroup.call(d3.axisLeft(newYScale));
             
-            // Update line paths
             const lineOriginal = d3.line()
                 .x(d => newXScale(d.year))
                 .y(d => newYScale(d.temperature));
@@ -561,24 +516,18 @@ function showCountryModal(isoCode, countryName) {
             zoomableContent.selectAll("path").data([countryData, smoothedData])
                 .attr("d", (d, i) => i === 0 ? lineOriginal(d) : lineSmoothed(d));
             
-            // Update circles
             zoomableContent.selectAll("circle")
                 .attr("cx", d => newXScale(d.year))
                 .attr("cy", d => newYScale(d.temperature));
         });
     
-    // Apply zoom to the SVG
     graphSvg.call(lineZoom);
-    
-    // Add X axis label
     graphSvg.append("text")
         .attr("class", "axis-label")
         .attr("x", graphWidth / 2)
         .attr("y", graphHeight - 5)
         .style("text-anchor", "middle")
         .text("Year");
-    
-    // Add Y axis label
     graphSvg.append("text")
         .attr("class", "axis-label")
         .attr("transform", "rotate(-90)")
@@ -587,7 +536,6 @@ function showCountryModal(isoCode, countryName) {
         .style("text-anchor", "middle")
         .text("Temperature (°C)");
     
-    // Close modal when clicking outside content
     modal.on("click", function(event) {
         if (event.target === this) {
             modal.style("display", "none");
