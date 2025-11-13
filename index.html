@@ -34,5 +34,129 @@
     </div>
     <div id="tooltip"></div>
     <div id="modal" style="display: none"></div>
+    <div class="description">
+      <h3>Rationale:</h3>
+      <p>
+        Our visualization aims to help answer the question: How “global” is
+        global warming?. To do this we chose to use a choropleth geospatial
+        visualization since our question is fundamentally a spatial question. We
+        realized that the best way to answer “how global” has to be through a
+        map. A choropleth enables viewers to immediately recognize patterns
+        because they are not only familiar with maps but the use of colors to
+        represent temperature overlaid on to them is intuitive. Polar regions
+        warming rapidly or tropics showing slower rates of change as easily
+        seen. We considered many alternatives such as heatmaps, line charts,
+        density based plots, and more however these were all less intuitive for
+        analyzing global trends between geospatial regions and made switching to
+        comparisons of rates of change increasingly difficult. The choropleth
+        allowed for both fine grained detail between national boundaries along
+        with intuitive trend comparisons. To allow for time based analysis we
+        used a time slider ranging from 1850 to 2014 allowing not only spatial
+        but temporal comparisons allowing users to explore isolated impacts of
+        time and space (dT/dt and dT/dx,y). Lastly, we added zoom and pan
+        functionality to choropleth to allow for analysis of smaller countries
+        as well. <br />
+        <br />
+        Because we wanted to show differences in trends in global warming
+        against spatio-temporal differences we needed to not only plot absolute
+        temperatures, but percent change as well. Absolute temperature gives
+        viewers an baseline idea for the region’s climate (Russia is cold, India
+        is hot) whereas percent change emphasizes warming intensity relative to
+        each region and year. To show both we added a toggle switching between
+        absolute temperature (degree Celsius) and percentage change. We
+        considered showing both together as side by side choropleth maps but
+        this added too much clutter and took away from the intuitive trends that
+        the choropleth was originally chosen for. A toggle preserved clarity
+        while still providing analytical flexibility. Our color scheme uses a
+        red versus blue palette centered on zero as the neutral. We tested
+        alternatives, including Viridis and multi-hue gradients, but they lacked
+        the immediate intuitive understanding of “blue = cooler” and “red =
+        warmer.” <br />
+        <br />
+        As intuitive as the choropleth is for initial trend analysis, numerical
+        analysis is quite difficult as you cannot compare multiple sets of time
+        at once. To fix this and to allow for better quantitative analysis we
+        added a tooltip and a modal on click of each country. The tooltip gives
+        context information such as year, absolute temperature, and temperature
+        change without any click and the modal contains a line graph for
+        temperature versus time for that country specifically. We went with a
+        modal over an embedded line chart on the main page in the corner to
+        reduce clutter and improve proper trend analysis for the user. The modal
+        isolates the analysis to just the temperature and time. To complement
+        this we added zoom and pan functionality to the line graph as well.
+        Lastly, we added a kalman filter to plot a smoothened line along with
+        the base plot to reduce the sharpness of the line graph and give a
+        better general trend line. We chose a kalman filter over traditional
+        moving averages like EWMA to give better control over reliance on noisy
+        data. Together, these interactive features strike a harmonious balance
+        between macro level geospatial trend identification through the
+        choropleth and isolated lower level quantitative analysis through the
+        modal, giving local insights and global comparisons.
+      </p>
+      <h3>Development Process:</h3>
+      <p>
+        Almost all parts of the development process were highly collaborative.
+        To decide on the dataset, we all worked together to gather the data,
+        perform EDA, and brainstorm ideas of domains to explore- such as
+        temperatures, vegetation, and forest fires. To us, temperature seemed
+        very interesting because we noticed that the average global temperatures
+        rose significantly since 1975. We wanted to develop an interactive
+        visualization to allow one to understand the spatial and temporal
+        distribution of temperatures across the countries, something that a
+        static graph of aggregated global temperatures wouldn’t be able to show.
+        This would provide one with greater insight into the trends of the
+        changing climate in specific regions in recent years. With this goal in
+        mind, we all individually sketched out a rough design of our
+        visualization along with important features we want to include. Then, we
+        brought together our ideas and concretely planned out our final dynamic
+        visualization. <br />
+        <br />
+        After this point, we decided to split up the work. Firstly, Yash started
+        with pre-processing the data into a CSV that D3 can read off of, while
+        Shiv and Shaan began researching how to integrate the map with D3. Once
+        we had the data and TopoJSON integration ready, we began work on the
+        features. We all worked on separate features, Yash worked on adding the
+        gradient colours on the map and designing the legend, Shaan worked on
+        the toggle switch for switching between the two measures, and Shiv
+        worked on designing the tooltip and modal window for closer
+        country-specific analysis. When Shiv finished plotting the line graph
+        for a closer look at each’s countries temperature, we saw the the
+        visualization was quite abrupt and sharp, so Shiv implemented a Kalman
+        filter to smoothen the graph as well as adding zoom and pan to the modal
+        for closer inspection. <br />
+        <br />
+        In the end, we came back together to holistically evaluate our
+        visualization and webpage. We first went through our checklist of
+        features we initially planned and made sure that our implementation
+        covered all of the features. Then we performed rigorous bug testing by
+        experimenting with all of the features. This allowed us to identify
+        things to improve- such as limiting the zooming and panning of the map,
+        and improving user friendliness by adding useful captions. Finally, we
+        made sure all the fonts and CSS styling were consistent throughout
+        before hosting GitHub pages. <br />
+        <br />
+        All in all, the complete development process, from initial idea
+        brainstorming to final CSS touches, took around 40 people-hours. The
+        initial brainstorming was about 7 people-hours, because it involved a
+        lot of EDA and team discussion. The data processing and map research
+        stage took around 8 people-hours, which was more than expected. From the
+        API, temperature data had to be retrieved, aggregated, and modified to
+        get country average absolute and percentage change in temperatures. It
+        was essential that each country was associated with the correct
+        ISO-numeric code to ensure that it works with the TopoJSON map. This
+        took a while because the initial dataset didn’t have ISO codes, and
+        retrieving the corresponding ISO codes from an external API didn’t help
+        because countries’ names were mismatching (For instance, Ivory Coast
+        v.s. Cote D’Ivoire). Thus these mismatches had to be handled manually.
+        Each of us, on average took 5 hours (15 people-hours) to implement the
+        individual features that we were responsible for, which includes: color
+        gradients, map panning and zooming, toggle switch for metrics, tooltip
+        on hover, and modal window on click. Something we found difficult was
+        making sure that all of the functions work together gracefully, which
+        involves defining functions that are abstracted correctly. Finally, over
+        7 people-hours took to rigorously evaluate, fix bugs, and CSS style to
+        ensure a robust and effective visualization.
+      </p>
+    </div>
   </body>
 </html>
