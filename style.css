@@ -10,6 +10,17 @@ body {
     margin: 20px 0;
 }
 
+.legend rect {
+    stroke: #000;
+    stroke-width: 1;
+}
+
+.legend text {
+    text-anchor: middle;
+    font-size: 12px;
+    font-weight: bold;
+}
+
 #measureToggle {
     position: absolute;
     top: 10px;
@@ -182,4 +193,39 @@ body {
     font-weight: bold;
     margin-bottom: 10px;
     text-align: center;
+}
+
+.line-graph-legend {
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+.legend-original {
+    color: rgba(231, 76, 60, 0.3);
+    font-weight: bold;
+}
+
+.legend-smoothed {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+.line-original {
+    fill: none;
+    stroke: #e74c3c;
+    stroke-width: 1;
+    stroke-opacity: 0.3;
+}
+
+.line-smoothed {
+    fill: none;
+    stroke: #e74c3c;
+    stroke-width: 2.5;
+}
+
+.data-point {
+    fill: #c0392b;
+    cursor: pointer;
 }

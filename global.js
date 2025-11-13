@@ -133,11 +133,7 @@ function drawLegend() {
             .tickFormat(d => (d > 0 ? '+' : '') + d.toFixed(1) + "%");
     }
     
-    const gradient = legend.append("defs")
-        .append("linearGradient")
-        .attr("id", "legend-gradient")
-        .attr("x1", "0%")
-        .attr("x2", "100%");
+    const gradient = legend.append("defs").append("linearGradient").attr("id", "legend-gradient").attr("x1", "0%").attr("x2", "100%");
     
     const numStops = 10;
     for (let i = 0; i <= numStops; i++) {
@@ -155,13 +151,9 @@ function drawLegend() {
     legend.append("rect")
         .attr("width", legendWidth)
         .attr("height", legendHeight)
-        .style("fill", "url(#legend-gradient)")
-        .style("stroke", "#000")
-        .style("stroke-width", 1);
+        .style("fill", "url(#legend-gradient)");
     
-    legend.append("g")
-        .attr("transform", `translate(0, ${legendHeight})`)
-        .call(legendAxis);
+    legend.append("g").attr("transform", `translate(0, ${legendHeight})`).call(legendAxis);
     
     const legendTitle = measure === 'absolute' ? "Average Temperature (°C)" : "Temperature Change (Δ%)";
     const mapSubtitle = measure === 'absolute' ? "Choropleth Map of Average Annual Temperatures (°C), aggregated by country" : "Choropleth Map of Temperature Change from previous year (%), aggregated by country";
@@ -170,9 +162,6 @@ function drawLegend() {
     legend.append("text")
         .attr("x", legendWidth / 2)
         .attr("y", -5)
-        .style("text-anchor", "middle")
-        .style("font-size", "12px")
-        .style("font-weight", "bold")
         .text(legendTitle);
 }
 
@@ -371,21 +360,9 @@ function showCountryModal(isoCode, countryName) {
         .attr("class", "line-graph-subtitle")
         .text("The annual averages are calculated by aggregating bi-monthly average temperature data for each country. Kalman filtering is applied to smooth the data to remove noise and clearly illustrate the general trend.");
     
-    const legendDiv = modalContent.append("div")
-        .style("text-align", "center")
-        .style("margin-bottom", "10px")
-        .style("font-size", "12px")
-        .style("color", "#666");
-    
-    legendDiv.append("span")
-        .style("color", "rgba(231, 76, 60, 0.3)")
-        .style("font-weight", "bold")
-        .text("━ Original Data  ");
-    
-    legendDiv.append("span")
-        .style("color", "#e74c3c")
-        .style("font-weight", "bold")
-        .text("━ Kalman Smoothed");
+    const legendDiv = modalContent.append("div").attr("class", "line-graph-legend");
+    legendDiv.append("span").attr("class", "legend-original").text("━ Original Data  ");
+    legendDiv.append("span").attr("class", "legend-smoothed").text("━ Kalman Smoothed");
     
     const graphWidth = 800;
     const graphHeight = 400;
@@ -407,17 +384,13 @@ function showCountryModal(isoCode, countryName) {
         .attr("width", innerWidth)
         .attr("height", innerHeight);
     
-    const zoomableContent = graphG.append("g")
-        .attr("clip-path", "url(#clip)");
+    const zoomableContent = graphG.append("g").attr("clip-path", "url(#clip)");
     
     const xScale = d3.scaleLinear()
         .domain(d3.extent(countryData, d => d.year))
         .range([0, innerWidth]);
     const yScale = d3.scaleLinear()
-        .domain([
-            d3.min(countryData, d => d.temperature) - 1,
-            d3.max(countryData, d => d.temperature) + 1
-        ])
+        .domain([d3.min(countryData, d => d.temperature) - 1, d3.max(countryData, d => d.temperature) + 1])
         .range([innerHeight, 0]);
     
     const smoothedData = kalmanFilter(countryData, 0.1, 0.5);
@@ -425,30 +398,17 @@ function showCountryModal(isoCode, countryName) {
     const lineOriginal = d3.line().x(d => xScale(d.year)).y(d => yScale(d.temperature));
     const lineSmoothed = d3.line().x(d => xScale(d.year)).y(d => yScale(d.temperature));
     
-    zoomableContent.append("path")
-        .datum(countryData)
-        .attr("fill", "none")
-        .attr("stroke", "#e74c3c")
-        .attr("stroke-width", 1)
-        .attr("stroke-opacity", 0.3)
-        .attr("d", lineOriginal);
-    
-    zoomableContent.append("path")
-        .datum(smoothedData)
-        .attr("fill", "none")
-        .attr("stroke", "#e74c3c")
-        .attr("stroke-width", 2.5)
-        .attr("d", lineSmoothed);
+    zoomableContent.append("path").attr("class", "line-original").datum(countryData).attr("d", lineOriginal);
+    zoomableContent.append("path").attr("class", "line-smoothed").datum(smoothedData).attr("d", lineSmoothed);
     
     zoomableContent.selectAll("circle")
         .data(smoothedData)
         .enter()
         .append("circle")
+        .attr("class", "data-point")
         .attr("cx", d => xScale(d.year))
         .attr("cy", d => yScale(d.temperature))
         .attr("r", 3)
-        .attr("fill", "#c0392b")
-        .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
             d3.select(this)
                 .attr("r", 5)
